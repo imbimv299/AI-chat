@@ -2,64 +2,364 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Ai-g!chat</title>
+  <title>Auiチャット</title>
   <style>
-    body { background: #111; color: #eee; font-family: sans-serif; padding: 20px; }
-    #chat { max-height: 400px; overflow-y: auto; margin-bottom: 10px; }
-    .msg { margin-bottom: 10px; }
-    .user { color: #81d4fa; }
-    .ai { color: #c5e1a5; }
-    input, button {
-      font-size: 16px; padding: 10px; width: 100%;
-      margin-top: 10px; box-sizing: border-box;
+    :root {
+      --bg: #111;
+      --text: #eee;
+      --user-bg: #2962ff;
+      --ai-bg: #2e7d32;
+    }
+
+    body.light {
+      --bg: #fff;
+      --text: #000;
+      --user-bg: #bbdefb;
+      --ai-bg: #c8e6c9;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid #444;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: rgba(255,255,255,0.05);
+    }
+
+    .msg {
+      max-width: 80%;
+      padding: 10px;
+      border-radius: 10px;
+      margin: 10px 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .user {
+      background: var(--user-bg);
+      align-self: flex-end;
+      color: #000;
+    }
+
+    .ai {
+      background: var(--ai-bg);
+      align-self: flex-start;
+      color: #000;
+    }
+
+    #input, #apikey {
+      padding: 10px;
+      font-size: 16px;
+      margin-top: 5px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 5px;
+    }
+
+    .controls button {
+      flex: 1;
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    #apikey {
+      margin-bottom: 10px;
     }
   </style>
 </head>
 <body>
-  <h2>🧠 ADEPTsAIchat (OpenRouter)</h2>
+  <h2>🧠 Auiチャット</h2>
+  <input id="apikey" placeholder="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" />
   <div id="chat"></div>
   <input id="input" placeholder="メッセージを入力..." />
-  <button onclick="send()">送信</button>
+  <div class="controls">
+    <button onclick="send()">送信</button>
+    <button onclick="toggleTheme()">🌓テーマ切替</button>
+    <button onclick="clearChat()">🗑履歴クリア</button>
+  </div>
 
   <script>
-    const API_KEY = "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"; // ← 新しいAPIキーに差し替えて！
-    const MODEL = "google/gemini-2.5-pro-exp-03-25"; // 他にも変更可：mistralai/mistral-7bなど
     const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
-    const chat = document.getElementById("chat");
+    const MODEL = "openai/gpt-3.5-turbo";
     const input = document.getElementById("input");
+    const chat = document.getElementById("chat");
+    const apikeyInput = document.getElementById("apikey");
 
+    // 履歴とAPIキーの読み込み
+    let messages = JSON.parse(localStorage.getItem("chat-history") || "[]");
+    let savedKey = localStorage.getItem("api-key");
+    if (savedKey) apikeyInput.value = savedKey;
+    messages.forEach(m => appendMessage(m.role, m.content));
+
+    // 送信処理
     async function send() {
+      const key = apikeyInput.value.trim();
       const text = input.value.trim();
-      if (!text) return;
-      append("👤", text, "user");
+      if (!key || !text) return alert("APIキーとメッセージを入力してね！");
+      localStorage.setItem("api-key", key);
+
+      appendMessage("user", text);
+      messages.push({ role: "user", content: text });
+      saveHistory();
       input.value = "";
       input.disabled = true;
 
-      const res = await fetch(ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Authorization": "Bearer " + API_KEY,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [{ role: "user", content: text }]
-        })
-      });
+      try {
+        const res = await fetch(ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + key,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: messages
+          })
+        });
+        const data = await res.json();
+        const reply = data.choices?.[0]?.message?.content || "❌ 応答エラー";
+        appendMessage("assistant", reply);
+        messages.push({ role: "assistant", content: reply });
+        saveHistory();
+      } catch (e) {
+        appendMessage("assistant", "❌ エラー発生：" + e.message);
+      }
 
-      const data = await res.json();
-      const reply = data.choices?.[0]?.message?.content || "❌ エラーが発生しました";
-      append("▶️", reply, "ai");
       input.disabled = false;
       input.focus();
       chat.scrollTop = chat.scrollHeight;
     }
 
-    function append(sender, text, cls) {
+    function appendMessage(role, text) {
       const div = document.createElement("div");
-      div.className = `msg ${cls}`;
-      div.textContent = `${sender}: ${text}`;
+      div.className = "msg " + (role === "user" ? "user" : "ai");
+      div.textContent = text;
       chat.appendChild(div);
+    }
+
+    function saveHistory() {
+      localStorage.setItem("chat-history", JSON.stringify(messages));
+    }
+
+    function clearChat() {
+      if (confirm("履歴を削除しますか？")) {
+        messages = [];
+        localStorage.removeItem("chat-history");
+        chat.innerHTML = "";
+      }
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle("light");
+      localStorage.setItem("theme", document.body.classList.contains("light") ? "light" : "dark");
+    }
+
+    if (localStorage.getItem("theme") === "light") {
+      document.body.classList.add("light");
+    }
+
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") send();
+    });
+  </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Aui風チャット</title>
+  <style>
+    :root {
+      --bg: #111;
+      --text: #eee;
+      --user-bg: #2962ff;
+      --ai-bg: #2e7d32;
+    }
+
+    body.light {
+      --bg: #fff;
+      --text: #000;
+      --user-bg: #bbdefb;
+      --ai-bg: #c8e6c9;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid #444;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: rgba(255,255,255,0.05);
+    }
+
+    .msg {
+      max-width: 80%;
+      padding: 10px;
+      border-radius: 10px;
+      margin: 10px 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .user {
+      background: var(--user-bg);
+      align-self: flex-end;
+      color: #000;
+    }
+
+    .ai {
+      background: var(--ai-bg);
+      align-self: flex-start;
+      color: #000;
+    }
+
+    #input, #apikey {
+      padding: 10px;
+      font-size: 16px;
+      margin-top: 5px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 5px;
+    }
+
+    .controls button {
+      flex: 1;
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    #apikey {
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>🧠 Auiチャット</h2>
+  <input id="apikey" placeholder="OpenRouterのAPIキーを入力 (例: sk-or-...)" />
+  <div id="chat"></div>
+  <input id="input" placeholder="メッセージを入力..." />
+  <div class="controls">
+    <button onclick="send()">送信</button>
+    <button onclick="toggleTheme()">🌓テーマ切替</button>
+    <button onclick="clearChat()">🗑履歴クリア</button>
+  </div>
+
+  <script>
+    const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
+    const MODEL = "openai/gpt-3.5-turbo";
+    const input = document.getElementById("input");
+    const chat = document.getElementById("chat");
+    const apikeyInput = document.getElementById("apikey");
+
+    // 履歴とAPIキーの読み込み
+    let messages = JSON.parse(localStorage.getItem("chat-history") || "[]");
+    let savedKey = localStorage.getItem("api-key");
+    if (savedKey) apikeyInput.value = savedKey;
+    messages.forEach(m => appendMessage(m.role, m.content));
+
+    // 送信処理
+    async function send() {
+      const key = apikeyInput.value.trim();
+      const text = input.value.trim();
+      if (!key || !text) return alert("APIキーとメッセージを入力してね！");
+      localStorage.setItem("api-key", key);
+
+      appendMessage("user", text);
+      messages.push({ role: "user", content: text });
+      saveHistory();
+      input.value = "";
+      input.disabled = true;
+
+      try {
+        const res = await fetch(ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + key,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: messages
+          })
+        });
+        const data = await res.json();
+        const reply = data.choices?.[0]?.message?.content || "❌ 応答エラー";
+        appendMessage("assistant", reply);
+        messages.push({ role: "assistant", content: reply });
+        saveHistory();
+      } catch (e) {
+        appendMessage("assistant", "❌ エラー発生：" + e.message);
+      }
+
+      input.disabled = false;
+      input.focus();
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function appendMessage(role, text) {
+      const div = document.createElement("div");
+      div.className = "msg " + (role === "user" ? "user" : "ai");
+      div.textContent = text;
+      chat.appendChild(div);
+    }
+
+    function saveHistory() {
+      localStorage.setItem("chat-history", JSON.stringify(messages));
+    }
+
+    function clearChat() {
+      if (confirm("履歴を削除しますか？")) {
+        messages = [];
+        localStorage.removeItem("chat-history");
+        chat.innerHTML = "";
+      }
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle("light");
+      localStorage.setItem("theme", document.body.classList.contains("light") ? "light" : "dark");
+    }
+
+    if (localStorage.getItem("theme") === "light") {
+      document.body.classList.add("light");
     }
 
     input.addEventListener("keydown", e => {
