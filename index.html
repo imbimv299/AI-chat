@@ -16,7 +16,7 @@
   </style>
 </head>
 <body>
-  <h2>🧠 Ai-g!chat (OpenRouter)</h2>
+  <h2>🧠 ADEPTsAIchat (OpenRouter)</h2>
   <div id="chat"></div>
   <input id="input" placeholder="メッセージを入力..." />
   <button onclick="send()">送信</button>
@@ -49,7 +49,7 @@
 
       const data = await res.json();
       const reply = data.choices?.[0]?.message?.content || "❌ エラーが発生しました";
-      append("🤖", reply, "ai");
+      append("▶️", reply, "ai");
       input.disabled = false;
       input.focus();
       chat.scrollTop = chat.scrollHeight;
