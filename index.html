@@ -1,103 +1,48 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Auiチャット</title>
   <style>
-    body {
-      background-color: #1e1e1e;
-      color: #eee;
-      font-family: "Segoe UI", sans-serif;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      margin: 0;
-    }
-    #chat {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px;
-    }
-    .msg {
-      margin: 10px 0;
-      padding: 10px 15px;
-      border-radius: 10px;
-      max-width: 75%;
-      white-space: pre-wrap;
-    }
-    .user { background: #2962ff; color: white; align-self: flex-end; }
-    .ai { background: #333; color: #c5e1a5; align-self: flex-start; }
-    #input-area {
-      display: flex;
-      padding: 10px;
-      background: #121212;
-    }
-    input {
-      flex: 1;
-      padding: 10px;
-      font-size: 16px;
-      background: #222;
-      border: none;
-      color: white;
-    }
-    button {
-      padding: 10px 20px;
-      background: #03dac5;
-      border: none;
-      color: black;
-      font-weight: bold;
-    }
+    body { font-family: sans-serif; background: #f0f0f0; padding: 20px; }
+    #chatbox { width: 100%; height: 150px; margin-bottom: 10px; }
+    #response { white-space: pre-wrap; background: white; padding: 10px; border-radius: 5px; }
   </style>
 </head>
 <body>
-  <div id="chat"></div>
-  <div id="input-area">
-    <input id="input" placeholder="メッセージを入力..." />
-    <button onclick="send()">送信</button>
-  </div>
+  <h1>🌟 Auiチャット（OpenRouter連携）</h1>
+  <textarea id="chatbox" placeholder="メッセージを入力してください..."></textarea><br>
+  <button onclick="sendMessage()">送信</button>
+  <h3>返答:</h3>
+  <div id="response">...</div>
 
   <script>
-    const chat = document.getElementById("chat");
-    const input = document.getElementById("input");
+    async function sendMessage() {
+      const userInput = document.getElementById("chatbox").value;
+      const responseBox = document.getElementById("response");
 
-    const API_KEY = "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"; // ← 自分のOpenRouter APIキー
-
-    async function send() {
-      const message = input.value.trim();
-      if (!message) return;
-      appendMessage("user", message);
-      input.value = "";
+      responseBox.textContent = "読み込み中...";
 
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${API_KEY}`,
-          "HTTP-Referer": "https://auichat.pages.dev", // 必要に応じて書き換え
+          "Authorization": "Bearer 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",
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "openai/gpt-3.5-turbo",
-          messages: [{ role: "user", content: message }],
+          model: "mistral/mistral-7b-instruct",
+          messages: [{ role: "user", content: userInput }]
         })
       });
 
       const data = await res.json();
-      const reply = data.choices?.[0]?.message?.content || "エラーが発生しました";
-      appendMessage("ai", reply);
-    }
 
-    function appendMessage(role, text) {
-      const div = document.createElement("div");
-      div.className = `msg ${role}`;
-      div.textContent = text;
-      chat.appendChild(div);
-      chat.scrollTop = chat.scrollHeight;
+      if (data.choices && data.choices.length > 0) {
+        responseBox.textContent = data.choices[0].message.content;
+      } else {
+        responseBox.textContent = "エラーが発生しました: " + JSON.stringify(data);
+      }
     }
-
-    // Enterキー対応
-    input.addEventListener("keydown", e => {
-      if (e.key === "Enter") send();
-    });
   </script>
 </body>
 </html>
