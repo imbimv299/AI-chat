@@ -1,59 +1,54 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Auiチャット</title>
+  <title>AUIチャット</title>
   <style>
-    body {
-      background: #111;
-      color: #eee;
-      font-family: sans-serif;
-      padding: 20px;
+    #chat-container {
+      width: 400px;
+      height: 300px;
+      border: 1px solid #ccc;
+      overflow-y: scroll;
     }
-    #chat { max-height: 400px; overflow-y: auto; margin-bottom: 10px; }
-    .msg { margin-bottom: 10px; white-space: pre-wrap; }
-    .user { color: #81d4fa; }
-    .ai { color: #c5e1a5; }
+    #message-input {
+      width: 300px;
+    }
   </style>
 </head>
 <body>
-  <h2>🤖 Auiチャット</h2>
-  <div id="chat"></div>
-  <input id="input" placeholder="メッセージを入力..." />
-  <button onclick="send()">送信</button>
+  <h1>AUIチャット</h1>
+  <div id="chat-container"></div>
+  <input type="text" id="message-input" placeholder="メッセージを入力">
+  <button onclick="sendMessage()">送信</button>
 
   <script>
-    const apiKey = "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"; // ←ここに自分のOpenRouter APIキーを入れる
-    const model = "google/gemma-7b-it:free";
+    // ここにAUIチャットのAPIキーやURLを設定
+    const apiKey = "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";
+    const apiUrl = "https://ai-chat-clh.pages.dev/"; // 例：架空のAPI URL
 
-    async function send() {
-      const input = document.getElementById("input");
-      const chat = document.getElementById("chat");
-      const message = input.value;
-      if (!message) return;
-
-      chat.innerHTML += `<div class="msg user">あなた: ${message}</div>`;
-      input.value = "";
-
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    function sendMessage() {
+      const message = document.getElementById("message-input").value;
+      // AUIチャットのAPIにメッセージを送信する機能
+      fetch(apiUrl, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://auichat.netlify.app",
-          "X-Title": "Auiチャット"
+          "Authorization": "Bearer " + apiKey,
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          model: model,
-          messages: [
-            { role: "user", content: message }
-          ]
-        })
+        body: JSON.stringify({ message: message })
+      })
+      .then(response => response.json())
+      .then(data => {
+        // レスポンスをチャットに表示する
+        displayMessage(data.sender, data.message);
       });
+    }
 
-      const data = await res.json();
-      const reply = data.choices?.[0]?.message?.content || "エラーが発生しました";
-      chat.innerHTML += `<div class="msg ai">Aui: ${reply}</div>`;
+    function displayMessage(sender, message) {
+      const chatContainer = document.getElementById("chat-container");
+      const newMessage = document.createElement("div");
+      newMessage.textContent = sender + ": " + message;
+      chatContainer.appendChild(newMessage);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
     }
   </script>
 </body>
