@@ -1,92 +1,240 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>#チャット</title>
+  <title>Auiチャット</title>
   <style>
+    * { box-sizing: border-box; }
     body {
-      font-family: 'Inter', sans-serif;
-      background-color: #282c34;
-      color: #abb2bf;
       margin: 0;
-      padding: 0;
+      font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background-color: #1e1e2f;
+      color: #e1e1e6;
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
+      height: 100vh;
+    }
+
+    header {
+      padding: 12px 20px;
+      background-color: #292b3a;
+      font-size: 20px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
     #chat-container {
       flex: 1;
       padding: 20px;
-      overflow-y: scroll;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
     }
 
     .message {
-      margin-bottom: 8px;
-      padding: 10px;
-      border-radius: 5px;
+      max-width: 80%;
+      padding: 12px 15px;
+      border-radius: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      animation: fadeIn 0.3s ease-in-out;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
     }
 
     .user-message {
-      background-color: #3e4451;
       align-self: flex-end;
+      background-color: #3a3f5a;
+      border-bottom-right-radius: 0;
+      flex-direction: row-reverse;
     }
 
     .ai-message {
-      background-color: #44475a;
       align-self: flex-start;
+      background-color: #2c2f48;
+      border-bottom-left-radius: 0;
+    }
+
+    .icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background-color: #666;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .bubble {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .name {
+      font-size: 12px;
+      color: #aaa;
+      margin-bottom: 4px;
+    }
+
+    .status {
+      font-size: 10px;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    #input-container {
+      display: flex;
+      padding: 10px;
+      background-color: #292b3a;
+      border-top: 1px solid #444;
     }
 
     #message-input {
-      width: 70%;
-      padding: 10px;
-      border: 1px solid #abb2bf;
-      border-radius: 5px;
-      margin: 10px;
+      flex: 1;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      background-color: #1e1e2f;
+      color: #fff;
+      margin-right: 10px;
+      font-size: 16px;
     }
 
     #send-button {
+      padding: 12px 20px;
       background-color: #4caf50;
-      color: white;
-      padding: 10px 20px;
       border: none;
-      border-radius: 5px;
+      color: white;
+      border-radius: 8px;
       cursor: pointer;
+      font-size: 16px;
     }
 
     #send-button:hover {
       background-color: #388e3c;
     }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ローディングスピナー */
+    .spinner {
+      border: 3px solid #3a3f5a;
+      border-top: 3px solid #4caf50;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #444;
+      border-radius: 3px;
+    }
+
+    @media (max-width: 600px) {
+      #chat-container {
+        padding: 10px;
+      }
+      .message {
+        max-width: 95%;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1 style="padding-left: 10px;">🤖 Auiチャット</h1>
+  <header>🤖 Auiチャット</header>
   <div id="chat-container"></div>
-  <input type="text" id="message-input" placeholder="メッセージを入力">
-  <button id="send-button">送信</button>
+
+  <div id="input-container">
+    <input type="text" id="message-input" placeholder="メッセージを入力..." autocomplete="off">
+    <button id="send-button">送信</button>
+  </div>
 
   <script>
-    const apiKey = "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"; // ← ここにOpenRouterのAPIキーを直接書く
+    const apiKey = "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"; // OpenRouter APIキーに置き換える
     const apiUrl = "https://openrouter.ai/api/v1/chat/completions";
+    const modelId = "google/gemini-pro-2.5:experimental";
 
     const chatContainer = document.getElementById('chat-container');
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
 
-    function displayMessage(sender, message, isUser) {
-      const messageElement = document.createElement('div');
-      messageElement.classList.add('message');
-      messageElement.textContent = sender + ": " + message;
-      messageElement.classList.add(isUser ? 'user-message' : 'ai-message');
-      chatContainer.appendChild(messageElement);
+    function displayMessage({ message, isUser, name, icon, status, loading = false }) {
+      const msg = document.createElement('div');
+      msg.className = 'message ' + (isUser ? 'user-message' : 'ai-message');
+
+      const iconDiv = document.createElement('div');
+      iconDiv.className = 'icon';
+      iconDiv.textContent = icon;
+
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'name';
+      nameDiv.textContent = name;
+
+      const contentDiv = document.createElement('div');
+      if (loading) {
+        const spinner = document.createElement('div');
+        spinner.className = 'spinner';
+        contentDiv.appendChild(spinner);
+      } else {
+        contentDiv.textContent = message;
+      }
+
+      const statusDiv = document.createElement('div');
+      statusDiv.className = 'status';
+      statusDiv.textContent = status;
+
+      bubble.appendChild(nameDiv);
+      bubble.appendChild(contentDiv);
+      if (status) bubble.appendChild(statusDiv);
+
+      msg.appendChild(iconDiv);
+      msg.appendChild(bubble);
+      chatContainer.appendChild(msg);
       chatContainer.scrollTop = chatContainer.scrollHeight;
+      return statusDiv;
     }
 
     async function sendMessage() {
-      const message = messageInput.value.trim();
-      if (!message) return;
-      messageInput.value = '';
-      displayMessage("あなた", message, true);
+      const userText = messageInput.value.trim();
+      if (!userText) return;
+      messageInput.value = "";
+
+      const userStatus = displayMessage({
+        message: userText,
+        isUser: true,
+        name: "あなた",
+        icon: "🧑",
+        status: "送信中..."
+      });
+
+      const loader = displayMessage({
+        message: "",
+        isUser: false,
+        name: "Auiチャット",
+        icon: "🤖",
+        status: "",
+        loading: true
+      });
 
       try {
         const response = await fetch(apiUrl, {
@@ -96,24 +244,42 @@
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            model: "google/gemma-7b-it:free", // ← 無料モデルを使う
-            messages: [{ role: "user", content: message }]
+            model: modelId,
+            messages: [{ role: "user", content: userText }]
           })
         });
 
         const data = await response.json();
         if (data.error) throw new Error(data.error.message);
 
-        const aiReply = data.choices[0].message.content;
-        displayMessage("Auiチャット", aiReply, false);
+        const reply = data.choices[0].message.content;
+
+        chatContainer.removeChild(loader); // スピナー削除
+        displayMessage({
+          message: reply,
+          isUser: false,
+          name: "Auiチャット",
+          icon: "🤖",
+          status: "✓ 配信済み"
+        });
+
+        userStatus.textContent = "✓ 配信済み";
       } catch (err) {
-        displayMessage("エラー", err.message, false);
+        chatContainer.removeChild(loader);
+        displayMessage({
+          message: "エラー: " + err.message,
+          isUser: false,
+          name: "Auiチャット",
+          icon: "⚠️",
+          status: ""
+        });
+        userStatus.textContent = "× 送信失敗";
       }
     }
 
-    sendButton.addEventListener('click', sendMessage);
-    messageInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') sendMessage();
+    sendButton.addEventListener("click", sendMessage);
+    messageInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendMessage();
     });
   </script>
 </body>
